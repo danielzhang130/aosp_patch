@@ -35,7 +35,11 @@ fun main(args: Array<String>) {
     assert(!aospDirProperty.isNullOrBlank())
     assert(!patchDirProperty.isNullOrBlank())
 
+    properties.remove("aosp_dir")
+    properties.remove("patch_dir")
+
     val manifest = readManifest(aospDirProperty!!)
+    loadCustomManifest(properties, manifest)
     val patchDir = File(Paths.get(patchDirProperty!!).toAbsolutePath().toString())
     assert(patchDir.exists())
 
@@ -68,7 +72,7 @@ fun main(args: Array<String>) {
         val projectDir = File(Paths.get(args[1]).toAbsolutePath().toString())
         assert(projectDir.exists())
 
-        val project = manifest.findByDir(projectDir)
+        val project = manifest.findByDir(aospDirProperty, projectDir)
         if (project == null) {
             println("${args[1]} not a project")
             return
@@ -78,6 +82,15 @@ fun main(args: Array<String>) {
 
         formatPatch(projectDir, sinceCommit, File(patchDir, project.name.replace("/", "_") + ".patch"))
     }
+}
+
+fun loadCustomManifest(properties: Properties, manifest: Manifest) {
+    manifest.projects = properties.map {
+        Project().apply {
+            name = it.key.toString()
+            path = it.value.toString()
+        }
+    } + manifest.projects
 }
 
 fun branch(projectDir: File, branch: String) {
@@ -110,11 +123,11 @@ fun applyPatch(projectDir: File, patch: File) {
         .waitFor()
 }
 
-private fun Manifest.findByDir(projectDir: File): Project? {
-    val pwd = File("")
+private fun Manifest.findByDir(baseDir: String, projectDir: File): Project? {
+    val base = File(baseDir)
     var cur = projectDir
-    while (cur.startsWith(pwd.absoluteFile)) {
-        val relative = cur.toRelativeString(pwd.absoluteFile)
+    while (cur.startsWith(base.absoluteFile)) {
+        val relative = cur.toRelativeString(base.absoluteFile)
         val project = projects.find { relative == it.path }
         if (project != null) {
             return project
