@@ -55,30 +55,44 @@ fun main(args: Array<String>) {
             val name = it.nameWithoutExtension
             val project = manifest.findByName(name)
             if (project == null) {
-                println("$name not found")
+                System.err.println("$name not found")
                 return@forEach
             }
 
             val projectDir = File(Paths.get(project.path).toAbsolutePath().toString())
             if (!projectDir.exists()) {
-                println("$projectDir does not exist")
+                System.err.println("$projectDir does not exist")
                 return@forEach
             }
 
+            if (!branchExists(projectDir, "patch-base")) {
+                branch(projectDir, "patch-base")
+                if (!branchExists(projectDir, "patch-base")) {
+                    System.err.println("branch patch-base does not exist")
+                    return@forEach
+                }
+            } else {
+                moveBranch(projectDir, "patch-base", "HEAD")
+            }
+
             branch(projectDir, "patch-$time")
+            if (!branchExists(projectDir, "patch-$time")) {
+                System.err.println("branch patch-$time does not exist")
+                return@forEach
+            }
             applyPatch(projectDir, it)
         }
-    } else if (args.size == 3 && args[0] == "format") {
+    } else if (args.size >= 2 && args[0] == "format") {
         val projectDir = File(Paths.get(args[1]).toAbsolutePath().toString())
         assert(projectDir.exists())
 
         val project = manifest.findByDir(aospDirProperty, projectDir)
         if (project == null) {
-            println("${args[1]} not a project")
+            System.err.println("${args[1]} not a project")
             return
         }
 
-        val sinceCommit = args[2]
+        val sinceCommit = if (args.size == 3) args[2] else "patch-base"
 
         formatPatch(projectDir, sinceCommit, File(patchDir, project.name.replace("/", "_") + ".patch"))
     }
@@ -91,6 +105,27 @@ fun loadCustomManifest(properties: Properties, manifest: Manifest) {
             path = it.value.toString()
         }
     } + manifest.projects
+}
+
+fun branchExists(projectDir: File, branch: String): Boolean {
+    val command = "git show-ref --verify --quiet refs/heads/$branch"
+    return ProcessBuilder(command.split(" "))
+        .directory(projectDir)
+        .inheritIO()
+        .start()
+        .run {
+            waitFor()
+            exitValue() == 0
+        }
+}
+
+fun moveBranch(projectDir: File, branch: String, ref: String) {
+    val command = "git branch -f $branch $ref"
+    ProcessBuilder(command.split(" "))
+        .directory(projectDir)
+        .inheritIO()
+        .start()
+        .waitFor()
 }
 
 fun branch(projectDir: File, branch: String) {
