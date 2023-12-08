@@ -1,6 +1,7 @@
 import org.simpleframework.xml.core.Persister
 import java.io.File
 import java.io.FileInputStream
+import java.io.InputStreamReader
 import java.nio.file.Paths
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -150,12 +151,16 @@ fun formatPatch(projectDir: File, sinceCommit: String, patchFile: File) {
 
 fun applyPatch(projectDir: File, patch: File) {
     val command = "git am --reject $patch"
-    println(command)
-    ProcessBuilder(command.split(" "))
+    val process = ProcessBuilder(command.split(" "))
         .directory(projectDir)
-        .inheritIO()
+        .redirectErrorStream(true)
         .start()
-        .waitFor()
+    val code = process.waitFor()
+    if (code != 0) {
+        InputStreamReader(process.inputStream).use {
+            it.forEachLine(::println)
+        }
+    }
 }
 
 private fun Manifest.findByDir(baseDir: String, projectDir: File): Project? {
