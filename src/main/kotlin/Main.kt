@@ -149,7 +149,7 @@ fun formatPatch(projectDir: File, sinceCommit: String, patchFile: File) {
 }
 
 fun applyPatch(projectDir: File, patch: File) {
-    val command = "git am $patch"
+    val command = "git am --reject $patch"
     println(command)
     ProcessBuilder(command.split(" "))
         .directory(projectDir)
