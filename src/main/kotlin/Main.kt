@@ -131,10 +131,7 @@ fun moveBranch(projectDir: File, branch: String, ref: String) {
 
 fun branch(projectDir: File, branch: String) {
     val command = "git checkout -b $branch"
-    quietProcess(
-        ProcessBuilder(command.split(" "))
-            .directory(projectDir)
-    )
+    quietProcess(command, projectDir)
 }
 
 fun formatPatch(projectDir: File, sinceCommit: String, patchFile: File) {
@@ -149,18 +146,18 @@ fun formatPatch(projectDir: File, sinceCommit: String, patchFile: File) {
 
 fun applyPatch(projectDir: File, patch: File) {
     val command = "git am --reject $patch"
-    quietProcess(
-        ProcessBuilder(command.split(" "))
-            .directory(projectDir)
-    )
+    quietProcess(command, projectDir)
 }
 
-private fun quietProcess(processBuilder: ProcessBuilder) {
+private fun quietProcess(command: String, pwd: File) {
+    val processBuilder = ProcessBuilder(command.split(" "))
+        .directory(pwd)
     val process = processBuilder
         .redirectErrorStream(true)
         .start()
     val code = process.waitFor()
     if (code != 0) {
+        println("Error $command code $code")
         InputStreamReader(process.inputStream).use {
             it.forEachLine(::println)
         }
